@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WOLF LABS: Classroom OS - AI Ethics</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- React & ReactDOM (Version 18) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        void: '#030712',       // Deepest Slate
+                        glass: 'rgba(255, 255, 255, 0.03)',
+                        glassHover: 'rgba(255, 255, 255, 0.08)',
+                        border: 'rgba(255, 255, 255, 0.1)',
+                        primary: '#3b82f6',    // Elegant Blue
+                        accent: '#a855f7',     // Elegant Purple
+                        success: '#10b981',    // Emerald
+                        warning: '#f59e0b',    // Amber
+                        danger: '#ef4444',     // Red
+                        stt: '#ec4899'         // Pink for Speaking Prompts
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        serif: ['Merriweather', 'Georgia', 'serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+        
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+
+        .reading-text p { margin-bottom: 1.5rem; line-height: 1.8; }
+        .reading-text p:first-of-type::first-letter { font-size: 3.5rem; float: left; margin-right: 0.5rem; line-height: 1; color: #3b82f6; font-weight: bold; }
+        
+        @keyframes pulse-stt {
+            0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(236, 72, 153, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+        }
+        .stt-glow { animation: pulse-stt 2s infinite; }
+    </style>
+</head>
+<body class="bg-void text-gray-100 overflow-hidden font-sans antialiased selection:bg-primary/30">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // ==========================================
+        // EXTENDED DATA SOURCE (B1 - 80% STT OPTIMIZED)
+        // ==========================================
+
+        const DB = {
+            icebreaker: [
+                { 
+                    q: "If you could have a personal robot to do one chore forever, what would it be?", 
+                    followUp: "Discuss: Would you feel lazy, or would you use that free time for something productive?",
+                    starter: "If I had a robot, it would... because..."
+                },
+                { 
+                    q: "Do you think AI will ever be able to feel real human emotions?", 
+                    followUp: "Discuss: If an AI cries, is it real sadness or just advanced programming?",
+                    starter: "I believe AI will/won't feel emotions because..."
+                },
+                { 
+                    q: "If an AI writes a hit song, who deserves the Grammy? The coder or the AI?", 
+                    followUp: "Discuss: How does this compare to a photographer taking a picture of nature?",
+                    starter: "In my opinion, the Grammy belongs to... because..."
+                }
+            ],
+            conceptTuring: {
+                title: "The Turing Test",
+                steps: [
+                    { icon: "fa-brain", title: "The Origin", text: "Proposed by mathematician Alan Turing in 1950, it was originally called the 'Imitation Game'." },
+                    { icon: "fa-comments", title: "The Method", text: "A human judge has a text conversation with two hidden entities: one human and one machine." },
+                    { icon: "fa-robot", title: "The Goal", text: "If the judge cannot confidently tell which one is the machine, the AI has 'passed' the Turing Test." }
+                ],
+                sttPrompt: "🗣️ PAIR WORK: Do you think passing the Turing Test means a machine is actually 'smart', or is it just a good liar?",
+                starter: "I think passing the test means... / To me, intelligence is..."
+            },
+            reading: {
+                title: "The $400,000 Prompt",
+                subtitle: "When Code Beats Canvas",
+                article: `In 2022, a piece of artwork won first place at the Colorado State Fair. The artist, Jason Allen, didn't use a brush, paint, or a canvas. Instead, he used a keyboard. He generated the image, called "Théâtre D'opéra Spatial", using an artificial intelligence program named Midjourney. 
+                
+                When the human artists discovered that Jason used AI, they were furious. They argued that writing a text "prompt" (instructions for the AI) is not real art. Jason defended himself, saying he spent over 80 hours adjusting the text prompts to get the perfect image. 
+                
+                This event sparked a global debate about ethics and copyright. If an AI generates a masterpiece in seconds, who is the real owner? If AI art becomes indistinguishable from human art, will traditional artists lose their jobs? The future of creativity is now a hypothetical puzzle we must solve.`,
+                pairWork: "🗣️ DISCUSSION: Do you agree with Jason Allen? Is spending 80 hours writing text prompts equal to spending 80 hours painting?",
+                starter: "I agree/disagree with Jason because writing a prompt is/isn't like...",
+                questions: [
+                    { q: "What tool did Jason Allen use to create his winning artwork?", answer: "An AI program", options: ["A digital paintbrush", "An AI program", "A professional camera", "A team of painters"] },
+                    { q: "Why were traditional human artists angry?", answer: "Because he didn't paint it manually", options: ["Because the prize money was too low", "Because he didn't paint it manually", "Because the painting was ugly", "Because he stole their paint"] }
+                ]
+            },
+            theory: {
+                intro: "Before executing the drills, process the core grammatical parameters required for conditional logic.",
+                cond1: { name: "1st Conditional", type: "Real Possibilities", structure: "If + Present Simple, Will + Base Verb", example: "If AI improves, artists will adapt." },
+                cond2: { name: "2nd Conditional", type: "Hypothetical Scenarios", structure: "If + Past Simple, Would + Base Verb", example: "If I were a robot, I would not need to sleep." }
+            },
+            cond1: [
+                { q: "If AI ___ faster, artists will use it more.", answer: "improves", options: ["improve", "improves", "improved", "will improve"], followUp: "🗣️ STT: What is one job that WILL change if AI improves?", starter: "If AI improves, I think [Job] will..." },
+                { q: "If you write a good prompt, the AI ___ a beautiful image.", answer: "will generate", options: ["generates", "would generate", "will generate", "generated"], followUp: "🗣️ STT: What kind of image will you generate if you use an AI today?", starter: "If I use an AI today, I will generate an image of..." },
+                { q: "Will the robot take our jobs if it ___ smarter?", answer: "gets", options: ["will get", "get", "got", "gets"], followUp: "🗣️ STT: Ask your partner: Will you be worried if robots get smarter?", starter: "Yes, I will be worried because... / No, I won't because..." }
+            ],
+            cond2: [
+                { q: "If I ___ a robot, I would not need to sleep.", answer: "were", options: ["am", "was", "were", "would be"], followUp: "🗣️ STT: If you were a robot, what would you do with your extra 8 hours of night time?", starter: "If I were a robot, I would..." },
+                { q: "What ___ you do if an AI took your job tomorrow?", answer: "would", options: ["will", "do", "would", "did"], followUp: "🗣️ STT: Answer the question! What would you do?", starter: "If an AI took my job, I would..." },
+                { q: "If she ___ a $400,000 prompt, she would sell it immediately.", answer: "had", options: ["have", "has", "had", "would have"], followUp: "🗣️ STT: If you had $400,000 right now, what is the FIRST thing you would buy?", starter: "If I had $400k, I would buy..." }
+            ],
+            dilemma: [
+                { 
+                    statement: "AI art is not real art because it lacks a human soul.", 
+                    agreeStarter: "I agree. Real art requires...", 
+                    disagreeStarter: "I disagree. The human creates the prompt, so..." 
+                },
+                { 
+                    statement: "In the future, using AI to write school essays should be completely legal and normal.", 
+                    agreeStarter: "I agree. We use calculators for math, so...", 
+                    disagreeStarter: "I disagree. If AI writes the essay, students won't learn how to..." 
+                }
+            ],
+            roleplay: [
+                { 
+                    title: "The Art Gallery Confrontation", 
+                    context: "A museum is offering $10,000 for a new art piece. You are arguing over who should win.",
+                    roleA: { name: "The Prompt Engineer", desc: "You used AI to make a perfect image.", starter: "I deserve the prize because my prompt took 80 hours to write. If I didn't..." },
+                    roleB: { name: "The Traditional Painter", desc: "You painted with real oil colors for 3 months.", starter: "That is not fair! If you use a computer, it is not real effort. I would..." }
+                },
+                { 
+                    title: "The HR Department", 
+                    context: "A company wants to replace 50% of its workers with AI.",
+                    roleA: { name: "The CEO", desc: "You want to save money and increase speed.", starter: "If we use AI, the company will make more money. We will..." },
+                    roleB: { name: "The Employee Leader", desc: "You are protecting the workers' jobs.", starter: "If you fire us, the company will lose its human touch. Customers would..." }
+                }
+            ]
+        };
+
+        const MODULES = [
+            { id: 'icebreaker', title: 'System Boot', subtitle: 'Warm-up Protocol', type: 'icebreaker', data: DB.icebreaker },
+            { id: 'conceptTuring', title: 'The Turing Concept', subtitle: 'Knowledge Base', type: 'concept', data: DB.conceptTuring },
+            { id: 'reading', title: 'Core Document', subtitle: 'Reading Comprehension', type: 'reading', data: DB.reading },
+            { id: 'theory', title: 'Grammar Core', subtitle: 'System Rules', type: 'theory', data: DB.theory },
+            { id: 'cond1', title: 'Real Futures', subtitle: '1st Conditional', type: 'quiz', data: DB.cond1 },
+            { id: 'cond2', title: 'Hypotheticals', subtitle: '2nd Conditional', type: 'quiz', data: DB.cond2 },
+            { id: 'dilemma', title: 'The Dilemma Board', subtitle: 'Agree or Disagree', type: 'dilemma', data: DB.dilemma },
+            { id: 'roleplay', title: 'Roleplay Arena', subtitle: 'Pair Negotiation', type: 'roleplay', data: DB.roleplay }
+        ];
+
+        // ==========================================
+        // ELEGANT UI COMPONENTS
+        // ==========================================
+
+        const SectionHeader = ({ title, subtitle, progress }) => (
+            <div className="flex justify-between items-end mb-10 w-full">
+                <div>
+                    <p className="text-primary text-xs font-bold uppercase tracking-[0.2em] mb-2">{subtitle}</p>
+                    <h2 className="text-3xl font-light tracking-tight text-white">{title}</h2>
+                </div>
+                {progress && (
+                    <div className="text-right">
+                        <span className="text-gray-500 font-mono text-sm">{progress}</span>
+                    </div>
+                )}
+            </div>
+        );
+
+        // 0. TEACHER GUIDE (Onboarding View)
+        const TeacherGuide = ({ onStartClass }) => (
+            <div className="absolute inset-0 z-[100] bg-void flex flex-col items-center justify-center p-8 animate-in fade-in duration-500">
+                <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-primary via-stt to-accent"></div>
+                <div className="max-w-4xl w-full glass-panel p-12 rounded-3xl relative overflow-hidden">
+                    <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-stt/10 blur-3xl rounded-full"></div>
+                    
+                    <div className="flex items-center gap-4 mb-8 border-b border-border pb-6">
+                        <i className="fas fa-layer-group text-4xl text-primary"></i>
+                        <div>
+                            <h1 className="text-2xl font-black tracking-widest uppercase text-white">Wolf Labs</h1>
+                            <p className="text-stt font-mono text-sm uppercase">Instructor Protocol Active</p>
+                        </div>
+                    </div>
+
+                    <h2 className="text-4xl font-light text-white mb-6">Classroom OS: Flexible Deployment</h2>
+                    <p className="text-gray-400 text-lg mb-8 leading-relaxed max-w-2xl">
+                        This system is highly adaptable. You can use it <b>alongside your traditional slides</b> as an interactive lab, 
+                        or deploy it as a <b>standalone 100% complete lesson</b> (60-90 mins).
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                        <div className="bg-black/40 p-6 rounded-2xl border border-white/5">
+                            <i className="fas fa-bullhorn text-3xl text-stt mb-4"></i>
+                            <h3 className="text-white font-bold mb-2">80% STT Driven</h3>
+                            <p className="text-sm text-gray-500">Exercises do not auto-advance. Embedded "Speaking Starters" force live conversation.</p>
+                        </div>
+                        <div className="bg-black/40 p-6 rounded-2xl border border-white/5">
+                            <i className="fas fa-users text-3xl text-primary mb-4"></i>
+                            <h3 className="text-white font-bold mb-2">No Voice Recording</h3>
+                            <p className="text-sm text-gray-500">We removed gimmicky audio recording. All tasks are designed for real human-to-human pair work.</p>
+                        </div>
+                        <div className="bg-black/40 p-6 rounded-2xl border border-white/5">
+                            <i className="fas fa-pen text-3xl text-accent mb-4"></i>
+                            <h3 className="text-white font-bold mb-2">Live HUD</h3>
+                            <p className="text-sm text-gray-500">Access the hidden whiteboard (bottom right) at any time to type live vocabulary or corrections.</p>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end border-t border-border pt-8">
+                        <button onClick={onStartClass} className="px-10 py-4 bg-primary text-white text-sm font-bold uppercase tracking-widest rounded-full hover:bg-blue-600 shadow-[0_0_30px_rgba(59,130,246,0.3)] transition-all flex items-center gap-3 hover:scale-105">
+                            Boot Classroom OS <i className="fas fa-power-off"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        // 1. ICEBREAKER MODULE (Warm-up with Starters)
+        const IcebreakerModule = ({ data, moduleInfo, onComplete, onXP }) => {
+            const [currentQ, setCurrentQ] = useState(data[0]);
+            const handleRandomize = () => setCurrentQ(data[Math.floor(Math.random() * data.length)]);
+
+            return (
+                <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-4xl mx-auto w-full justify-center items-center text-center">
+                    <p className="text-primary text-xs font-bold uppercase tracking-[0.2em] mb-4"><i className="fas fa-fire mr-2"></i> {moduleInfo.subtitle}</p>
+                    <h2 className="text-4xl font-light tracking-tight text-white mb-12">Class Connection</h2>
+                    
+                    <div className="w-full flex flex-col gap-6 mb-10">
+                        <div className="glass-panel p-12 rounded-3xl w-full relative overflow-hidden group min-h-[200px] flex items-center justify-center">
+                            <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-primary via-accent to-primary opacity-50"></div>
+                            <h3 className="text-3xl md:text-4xl font-light leading-relaxed text-gray-200 transition-all duration-300">"{currentQ.q}"</h3>
+                        </div>
+                        
+                        <div className="bg-stt/10 border border-stt/30 p-8 rounded-2xl stt-glow flex flex-col items-center">
+                            <p className="text-white font-bold text-xl mb-4">{currentQ.followUp}</p>
+                            <div className="bg-black/40 px-6 py-3 rounded-xl border border-stt/20 w-full max-w-lg">
+                                <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Speaking Starter</p>
+                                <p className="text-stt font-mono text-lg italic">"{currentQ.starter}"</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                        <button onClick={handleRandomize} className="px-8 py-4 border border-border text-gray-300 text-sm font-bold uppercase tracking-widest rounded-full hover:bg-white hover:text-black transition-all">
+                            <i className="fas fa-random mr-2"></i> Randomize
+                        </button>
+                        <button onClick={() => { onXP(50); onComplete(); }} className="px-8 py-4 bg-white text-black text-sm font-bold uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:scale-105 transition-all">
+                            Proceed <i className="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 2. CONCEPT EXPLAINER MODULE
+        const ConceptModule = ({ data, moduleInfo, onComplete, onXP }) => {
+            const [step, setStep] = useState(0);
+            const isDone = step >= data.steps.length;
+
+            return (
+                <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-5xl mx-auto w-full justify-center">
+                    <SectionHeader title={moduleInfo.title} subtitle={moduleInfo.subtitle} progress={`Data Set 0${Math.min(step + 1, data.steps.length)} / 0${data.steps.length}`} />
+                    
+                    {!isDone ? (
+                        <div className="flex-1 flex items-center justify-center mb-10">
+                            <div className="glass-panel p-12 rounded-3xl w-full max-w-2xl text-center relative overflow-hidden border-t-4 border-t-primary animate-in zoom-in-95 duration-300">
+                                <div className="w-24 h-24 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-8 border border-primary/20">
+                                    <i className={`fas ${data.steps[step].icon} text-4xl text-primary`}></i>
+                                </div>
+                                <h3 className="text-3xl font-light text-white mb-6 tracking-tight">{data.steps[step].title}</h3>
+                                <p className="text-xl text-gray-300 font-light leading-relaxed">{data.steps[step].text}</p>
+                                
+                                <div className="flex justify-center gap-3 mt-12">
+                                    {data.steps.map((_, i) => (
+                                        <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === step ? 'w-8 bg-primary' : 'w-2 bg-gray-700'}`}></div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex items-center justify-center mb-10 animate-in fade-in duration-500">
+                            <div className="bg-stt/10 border border-stt/40 p-12 rounded-3xl text-center max-w-2xl w-full stt-glow">
+                                <i className="fas fa-comments text-5xl text-stt mb-6"></i>
+                                <h3 className="text-3xl font-light text-white mb-4">Critical Analysis</h3>
+                                <p className="text-xl text-white font-bold leading-relaxed mb-6">{data.sttPrompt}</p>
+                                <div className="bg-black/40 px-6 py-4 rounded-xl border border-stt/20 text-left">
+                                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Speaking Starter</p>
+                                    <p className="text-stt font-mono text-lg italic">"{data.starter}"</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end">
+                        <button onClick={() => { if(!isDone) setStep(s => s + 1); else { onXP(50); onComplete(); } }} className="px-8 py-4 bg-white text-black text-sm font-bold uppercase tracking-widest rounded-full hover:bg-gray-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] transition-all">
+                            {!isDone ? 'Next Parameter' : 'Complete Discussion'} <i className="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 3. READING COMPREHENSION MODULE (With Starters)
+        const ReadingModule = ({ data, moduleInfo, onComplete, onXP }) => {
+            const [mode, setMode] = useState('read'); // read, pairwork, quiz
+            const [step, setStep] = useState(0);
+            const [selected, setSelected] = useState(null);
+            const [status, setStatus] = useState('idle');
+
+            const handleVerify = () => {
+                if (selected === data.questions[step].answer) {
+                    setStatus('correct');
+                    onXP(50);
+                    setTimeout(() => {
+                        if (step + 1 < data.questions.length) { setStep(s => s + 1); setSelected(null); setStatus('idle'); } 
+                        else { onComplete(); }
+                    }, 1200);
+                } else {
+                    setStatus('wrong');
+                    setTimeout(() => setStatus('idle'), 1200);
+                }
+            };
+
+            if (mode === 'read') {
+                return (
+                    <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-4xl mx-auto w-full">
+                        <SectionHeader title={moduleInfo.title} subtitle={moduleInfo.subtitle} progress="Phase 1: Analysis" />
+                        <div className="glass-panel rounded-3xl flex-1 overflow-hidden flex flex-col mb-8 border-l-4 border-l-primary bg-void/80">
+                            <div className="p-8 border-b border-border bg-black/40 text-center">
+                                <h1 className="text-4xl font-serif font-bold text-white tracking-tight mb-2">{data.title}</h1>
+                                <p className="text-primary font-mono text-sm uppercase tracking-widest">{data.subtitle}</p>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-10 hide-scroll reading-text text-gray-300 font-serif text-lg">
+                                {data.article.split('\n\n').map((para, i) => <p key={i}>{para}</p>)}
+                            </div>
+                        </div>
+                        <div className="flex justify-end">
+                            <button onClick={() => setMode('pairwork')} className="px-8 py-4 bg-stt text-white text-sm font-bold uppercase tracking-widest rounded-full hover:bg-pink-600 shadow-[0_0_20px_rgba(236,72,153,0.3)] transition-all">
+                                Proceed to Discussion <i className="fas fa-comments ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (mode === 'pairwork') {
+                return (
+                    <div className="flex flex-col h-full animate-in zoom-in-95 duration-500 max-w-4xl mx-auto w-full justify-center text-center">
+                        <h2 className="text-4xl font-light text-white mb-10">Comprehension Check</h2>
+                        <div className="bg-stt/10 border border-stt/40 p-12 rounded-3xl w-full mb-10 stt-glow">
+                            <p className="text-2xl text-white font-bold leading-relaxed mb-8">{data.pairWork}</p>
+                            <div className="bg-black/40 px-8 py-4 rounded-xl border border-stt/20 text-left mx-auto max-w-2xl">
+                                <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Speaking Starter</p>
+                                <p className="text-stt font-mono text-xl italic">"{data.starter}"</p>
+                            </div>
+                        </div>
+                        <div className="flex justify-center">
+                            <button onClick={() => setMode('quiz')} className="px-8 py-4 bg-primary text-white text-sm font-bold uppercase tracking-widest rounded-full hover:bg-blue-600 shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all">
+                                Begin Data Audit <i className="fas fa-arrow-right ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="flex flex-col h-full animate-in slide-in-from-right duration-500 max-w-3xl mx-auto w-full justify-center">
+                    <SectionHeader title="Comprehension Audit" subtitle={data.title} progress={`Query 0${step + 1} / 0${data.questions.length}`} />
+                    <div className="glass-panel p-10 rounded-2xl mb-8">
+                        <h3 className="text-2xl text-white font-light leading-relaxed mb-8">{data.questions[step].q}</h3>
+                        <div className="flex flex-col gap-4">
+                            {data.questions[step].options.map(opt => (
+                                <button key={opt} onClick={() => status === 'idle' && setSelected(opt)} className={`p-4 rounded-xl text-left font-medium transition-all duration-300 ${selected === opt ? (status === 'correct' ? 'bg-success/20 border-success text-success ring-1 ring-success' : status === 'wrong' ? 'bg-danger/20 border-danger text-danger ring-1 ring-danger' : 'bg-primary/20 border-primary text-primary ring-1 ring-primary') : 'bg-glass border-border text-gray-400 hover:bg-glassHover hover:text-white'} border`}>
+                                    <i className={`fas ${selected === opt ? (status === 'correct' ? 'fa-check-circle' : status === 'wrong' ? 'fa-times-circle' : 'fa-circle-notch fa-spin') : 'fa-circle'} mr-4 opacity-50`}></i>{opt}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <button onClick={() => setMode('read')} className="text-gray-500 hover:text-white text-sm uppercase tracking-widest font-bold transition-colors"><i className="fas fa-book-open mr-2"></i> Review Text</button>
+                        <button onClick={handleVerify} disabled={!selected || status !== 'idle'} className="px-8 py-3 bg-white text-black text-sm font-bold uppercase tracking-widest rounded-full hover:bg-gray-200 disabled:opacity-30 transition-all flex items-center gap-3">Verify <i className="fas fa-shield-alt"></i></button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 4. THEORY MODULE
+        const TheoryModule = ({ data, moduleInfo, onComplete, onXP }) => {
+            const [acknowledged, setAcknowledged] = useState(false);
+            const handleComplete = () => { onXP(100); setAcknowledged(true); setTimeout(onComplete, 1200); };
+
+            return (
+                <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-5xl mx-auto w-full justify-center">
+                    <SectionHeader title={moduleInfo.title} subtitle={moduleInfo.subtitle} progress="Theory Logic" />
+                    <p className="text-gray-300 font-light text-lg mb-8 leading-relaxed max-w-3xl">{data.intro}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+                        {['cond1', 'cond2'].map((key, i) => (
+                            <div key={key} className={`glass-panel p-8 rounded-2xl border-l-4 ${i===0?'border-l-primary':'border-l-accent'} relative overflow-hidden group`}>
+                                <div className="absolute -top-4 -right-4 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><i className={`fas ${i===0?'fa-bolt':'fa-brain'} text-[120px] text-white`}></i></div>
+                                <div className="relative z-10">
+                                    <h3 className="text-3xl font-light text-white mb-1">{data[key].name}</h3>
+                                    <p className={`${i===0?'text-primary':'text-accent'} text-xs font-bold uppercase tracking-widest mb-8`}>{data[key].type}</p>
+                                    <div className="mb-6">
+                                        <p className="text-xs text-gray-500 uppercase tracking-widest mb-2 font-bold">Structure</p>
+                                        <p className="font-mono text-sm bg-black/40 p-4 rounded-xl text-gray-200 border border-white/10 shadow-inner">{data[key].structure}</p>
+                                    </div>
+                                    <div className="mb-6">
+                                        <p className="text-xs text-gray-500 uppercase tracking-widest mb-2 font-bold">Example</p>
+                                        <p className={`text-xl italic text-gray-100 font-light border-l-2 ${i===0?'border-primary/50':'border-accent/50'} pl-4`}>"{data[key].example}"</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex justify-end">
+                        <button onClick={handleComplete} disabled={acknowledged} className={`px-8 py-4 text-sm font-bold uppercase tracking-widest rounded-full transition-all flex items-center gap-3 ${acknowledged ? 'bg-success/20 text-success border border-success/50 cursor-not-allowed' : 'bg-white text-black hover:bg-gray-200 shadow-lg hover:shadow-white/20 hover:scale-105'}`}>
+                            {acknowledged ? 'Logic Synchronized' : 'Acknowledge Rules'} <i className={`fas ${acknowledged ? 'fa-check' : 'fa-arrow-right'}`}></i>
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 5. QUIZ MODULE (With Starters on Follow-up)
+        const QuizModule = ({ data, moduleInfo, onComplete, onXP }) => {
+            const [step, setStep] = useState(0);
+            const [selected, setSelected] = useState(null);
+            const [status, setStatus] = useState('idle');
+
+            const handleVerify = () => {
+                if (selected === data[step].answer) {
+                    onXP(50);
+                    if (data[step].followUp) {
+                        setStatus('discuss'); 
+                    } else {
+                        setStatus('correct');
+                        setTimeout(handleNext, 1200);
+                    }
+                } else {
+                    setStatus('wrong');
+                    setTimeout(() => setStatus('idle'), 1200);
+                }
+            };
+
+            const handleNext = () => {
+                if (step + 1 < data.length) { setStep(s => s + 1); setSelected(null); setStatus('idle'); } 
+                else { onComplete(); }
+            };
+
+            return (
+                <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-3xl mx-auto w-full justify-center">
+                    <SectionHeader title={moduleInfo.title} subtitle={moduleInfo.subtitle} progress={`0${step + 1} / 0${data.length}`} />
+                    
+                    <div className={`glass-panel p-10 rounded-2xl mb-6 transition-all ${status === 'discuss' ? 'opacity-50 pointer-events-none scale-95' : ''}`}>
+                        <h3 className="text-2xl text-gray-200 font-light leading-relaxed mb-8">
+                            {data[step].q.split('___').map((part, i, arr) => (
+                                <React.Fragment key={i}>
+                                    {part}
+                                    {i < arr.length - 1 && (
+                                        <span className={`inline-block px-4 py-1 mx-2 border-b-2 font-medium ${selected ? 'border-primary text-primary' : 'border-gray-600 text-gray-500'} ${status==='discuss'?'border-success text-success':''}`}>{selected || 'blank'}</span>
+                                    )}
+                                </React.Fragment>
+                            ))}
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {data[step].options.map(opt => (
+                                <button key={opt} onClick={() => status === 'idle' && setSelected(opt)} className={`p-4 rounded-xl text-left font-medium transition-all duration-300 ${selected === opt ? (status === 'correct' || status === 'discuss' ? 'bg-success/20 border-success text-success ring-1 ring-success' : status === 'wrong' ? 'bg-danger/20 border-danger text-danger ring-1 ring-danger' : 'bg-primary/20 border-primary text-primary ring-1 ring-primary') : 'bg-glass border-border text-gray-400 hover:bg-glassHover hover:text-white'} border`}>
+                                    <span className="opacity-50 mr-4 font-mono text-xs">{String(data[step].options.indexOf(opt) + 1).padStart(2, '0')}</span>{opt}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {status === 'discuss' && (
+                        <div className="bg-stt/10 border border-stt/40 p-6 rounded-2xl mb-6 stt-glow animate-in slide-in-from-bottom-5 flex flex-col items-center">
+                            <p className="text-white font-bold text-xl mb-4">{data[step].followUp}</p>
+                            <div className="bg-black/40 px-6 py-3 rounded-xl border border-stt/20 w-full text-left">
+                                <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Speaking Starter</p>
+                                <p className="text-stt font-mono text-lg italic">"{data[step].starter}"</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end">
+                        {status === 'discuss' ? (
+                            <button onClick={handleNext} className="px-8 py-3 bg-stt text-white text-sm font-bold uppercase tracking-widest rounded-full hover:bg-pink-600 shadow-[0_0_20px_rgba(236,72,153,0.3)] transition-all flex items-center gap-3">
+                                End Discussion & Next <i className="fas fa-forward"></i>
+                            </button>
+                        ) : (
+                            <button onClick={handleVerify} disabled={!selected || status !== 'idle'} className="px-8 py-3 bg-white text-black text-sm font-bold uppercase tracking-widest rounded-full hover:bg-gray-200 disabled:opacity-30 transition-all flex items-center gap-3">
+                                Execute <i className="fas fa-arrow-right"></i>
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // 6. THE DILEMMA BOARD (New Exercise Type)
+        const DilemmaModule = ({ data, moduleInfo, onComplete, onXP }) => {
+            const [step, setStep] = useState(0);
+
+            const handleNext = () => {
+                onXP(100);
+                if (step + 1 < data.length) setStep(s => s + 1);
+                else onComplete();
+            };
+
+            return (
+                <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-5xl mx-auto w-full justify-center">
+                    <SectionHeader title={moduleInfo.title} subtitle={moduleInfo.subtitle} progress={`Debate 0${step + 1} / 0${data.length}`} />
+                    
+                    <div className="glass-panel p-12 rounded-3xl w-full mb-10 text-center relative overflow-hidden">
+                        <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-success via-gray-500 to-danger"></div>
+                        <h3 className="text-3xl md:text-4xl font-light text-white mb-12 italic leading-relaxed">"{data[step].statement}"</h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="bg-success/10 border border-success/30 p-8 rounded-2xl text-left">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-8 h-8 rounded-full bg-success flex items-center justify-center text-white"><i className="fas fa-thumbs-up"></i></div>
+                                    <h4 className="text-xl font-bold text-success uppercase tracking-widest">Agree</h4>
+                                </div>
+                                <p className="text-sm text-gray-500 uppercase tracking-widest font-bold mb-2">Speaking Starter</p>
+                                <p className="font-mono text-lg text-white">"{data[step].agreeStarter}"</p>
+                            </div>
+
+                            <div className="bg-danger/10 border border-danger/30 p-8 rounded-2xl text-left">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-8 h-8 rounded-full bg-danger flex items-center justify-center text-white"><i className="fas fa-thumbs-down"></i></div>
+                                    <h4 className="text-xl font-bold text-danger uppercase tracking-widest">Disagree</h4>
+                                </div>
+                                <p className="text-sm text-gray-500 uppercase tracking-widest font-bold mb-2">Speaking Starter</p>
+                                <p className="font-mono text-lg text-white">"{data[step].disagreeStarter}"</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-center">
+                        <button onClick={handleNext} className="px-10 py-4 bg-white text-black text-sm font-bold uppercase tracking-widest rounded-full hover:bg-gray-200 transition-all flex items-center gap-3 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:scale-105">
+                            {step + 1 < data.length ? 'Next Dilemma' : 'Conclude Board'} <i className="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 7. ROLEPLAY ARENA (Replaces Vocal Recording)
+        const RoleplayModule = ({ data, moduleInfo, onComplete, onXP }) => {
+            const [step, setStep] = useState(0);
+
+            const handleNext = () => {
+                onXP(200);
+                if (step + 1 < data.length) setStep(s => s + 1);
+                else onComplete();
+            };
+
+            return (
+                <div className="flex flex-col h-full animate-in fade-in duration-700 max-w-5xl mx-auto w-full justify-center">
+                    <SectionHeader title={moduleInfo.title} subtitle={moduleInfo.subtitle} progress={`Scenario 0${step + 1} / 0${data.length}`} />
+                    
+                    <div className="bg-stt/10 border border-stt/30 p-8 rounded-3xl mb-8 text-center stt-glow">
+                        <h3 className="text-2xl font-bold text-white mb-2">{data[step].title}</h3>
+                        <p className="text-gray-400 font-light text-lg">"{data[step].context}"</p>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row gap-6 mb-10 h-full md:h-72">
+                        {/* Role A */}
+                        <div className="flex-1 glass-panel border-l-4 border-l-primary p-8 rounded-2xl flex flex-col">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Role A</p>
+                                    <h4 className="text-xl font-bold text-primary">{data[step].roleA.name}</h4>
+                                </div>
+                                <i className="fas fa-user-circle text-3xl text-primary/50"></i>
+                            </div>
+                            <p className="text-sm text-gray-400 mb-6 italic">"{data[step].roleA.desc}"</p>
+                            
+                            <div className="mt-auto bg-black/40 p-4 rounded-xl border border-white/5">
+                                <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Your Starter</p>
+                                <p className="font-mono text-white text-sm">"{data[step].roleA.starter}"</p>
+                            </div>
+                        </div>
+
+                        {/* VS Badge */}
+                        <div className="hidden md:flex flex-col justify-center items-center -mx-3 z-10">
+                            <div className="w-12 h-12 bg-void border border-border rounded-full flex items-center justify-center text-gray-500 font-black italic">VS</div>
+                        </div>
+
+                        {/* Role B */}
+                        <div className="flex-1 glass-panel border-l-4 border-l-accent p-8 rounded-2xl flex flex-col">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Role B</p>
+                                    <h4 className="text-xl font-bold text-accent">{data[step].roleB.name}</h4>
+                                </div>
+                                <i className="fas fa-user-astronaut text-3xl text-accent/50"></i>
+                            </div>
+                            <p className="text-sm text-gray-400 mb-6 italic">"{data[step].roleB.desc}"</p>
+                            
+                            <div className="mt-auto bg-black/40 p-4 rounded-xl border border-white/5">
+                                <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Your Starter</p>
+                                <p className="font-mono text-white text-sm">"{data[step].roleB.starter}"</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-center">
+                        <button onClick={handleNext} className="px-12 py-4 bg-stt text-white text-sm font-bold uppercase tracking-widest rounded-full hover:bg-pink-600 transition-all flex items-center gap-3 shadow-[0_0_20px_rgba(236,72,153,0.3)] hover:scale-105">
+                            {step + 1 < data.length ? 'Next Negotiation' : 'Conclude Roleplay'} <i className="fas fa-handshake"></i>
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // ==========================================
+        // MAIN APPLICATION & TEACHER HUD
+        // ==========================================
+
+        function App() {
+            const [status, setStatus] = useState('teacher-guide'); // teacher-guide, home, active, completion
+            const [currentModIdx, setCurrentModIdx] = useState(0);
+            const [globalXP, setGlobalXP] = useState(0);
+            const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+            const [completedMods, setCompletedMods] = useState([]);
+            
+            const [isNotesOpen, setIsNotesOpen] = useState(false);
+            const [teacherNotes, setTeacherNotes] = useState("• ");
+            const [isFullscreen, setIsFullscreen] = useState(false);
+
+            const handleXP = (amount) => setGlobalXP(prev => prev + amount);
+
+            const toggleFullscreen = () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(err => console.log(err));
+                    setIsFullscreen(true);
+                } else {
+                    document.exitFullscreen();
+                    setIsFullscreen(false);
+                }
+            };
+
+            const startSequence = (index = 0) => {
+                setCurrentModIdx(index);
+                setStatus('active');
+                setIsDashboardOpen(false);
+            };
+
+            const handleModuleComplete = () => {
+                const modId = MODULES[currentModIdx].id;
+                if (!completedMods.includes(modId)) setCompletedMods([...completedMods, modId]);
+
+                if (currentModIdx + 1 < MODULES.length) {
+                    setCurrentModIdx(prev => prev + 1);
+                } else {
+                    setStatus('completion');
+                }
+            };
+
+            const CurrentModule = MODULES[currentModIdx];
+
+            return (
+                <div className="h-screen w-screen flex flex-col relative bg-void">
+                    
+                    {/* GLOBAL BACKGROUND */}
+                    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+                        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/10 blur-[120px] rounded-full mix-blend-screen opacity-50"></div>
+                        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/10 blur-[120px] rounded-full mix-blend-screen opacity-50"></div>
+                        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wMykiLz48L3N2Zz4=')] opacity-50"></div>
+                    </div>
+
+                    {/* TEACHER GUIDE OVERLAY */}
+                    {status === 'teacher-guide' && (
+                        <TeacherGuide onStartClass={() => setStatus('home')} />
+                    )}
+
+                    {/* TOP NAVIGATION BAR */}
+                    {status !== 'teacher-guide' && (
+                        <header className="h-16 md:h-20 border-b border-border bg-void/50 backdrop-blur-md flex items-center justify-between px-6 md:px-8 relative z-50">
+                            <div className="flex items-center gap-4 md:gap-6">
+                                <button onClick={() => setIsDashboardOpen(!isDashboardOpen)} className="text-gray-400 hover:text-white transition-colors text-xl">
+                                    <i className={`fas ${isDashboardOpen ? 'fa-times' : 'fa-bars'}`}></i>
+                                </button>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] md:text-xs font-bold text-primary uppercase tracking-[0.2em]">Wolf Labs</span>
+                                    <span className="text-xs md:text-sm font-light text-gray-300">Classroom OS</span>
+                                </div>
+                            </div>
+                            
+                            {status === 'active' && (
+                                <div className="hidden md:flex items-center gap-2 text-xs font-mono text-gray-500 uppercase tracking-widest absolute left-1/2 transform -translate-x-1/2">
+                                    <span>Sequence:</span>
+                                    <span className="text-white bg-glass px-3 py-1 rounded-full border border-border">
+                                        {String(currentModIdx + 1).padStart(2, '0')} / {String(MODULES.length).padStart(2, '0')}
+                                    </span>
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-4 md:gap-6">
+                                <button onClick={toggleFullscreen} className="text-gray-500 hover:text-white transition-colors hidden sm:block" title="Toggle Fullscreen">
+                                    <i className={`fas ${isFullscreen ? 'fa-compress' : 'fa-expand'}`}></i>
+                                </button>
+                                <div className="flex items-center gap-2 md:gap-3">
+                                    <span className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-widest hidden sm:block">Class XP</span>
+                                    <span className="text-base md:text-lg font-light text-white">{globalXP}</span>
+                                </div>
+                            </div>
+                        </header>
+                    )}
+
+                    {/* RETRACTABLE DASHBOARD (SIDEBAR) */}
+                    <div className={`fixed inset-y-0 left-0 w-80 bg-void/95 backdrop-blur-xl border-r border-border z-40 transform transition-transform duration-500 ease-in-out pt-20 ${isDashboardOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                        <div className="p-8 h-full flex flex-col">
+                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em] mb-6">Mission Curriculum</h3>
+                            <div className="flex-1 overflow-y-auto space-y-2 hide-scroll">
+                                {MODULES.map((mod, idx) => {
+                                    const isDone = completedMods.includes(mod.id);
+                                    const isActive = status === 'active' && currentModIdx === idx;
+                                    return (
+                                        <button 
+                                            key={mod.id}
+                                            onClick={() => startSequence(idx)}
+                                            className={`w-full text-left p-4 rounded-xl transition-all duration-300 border ${isActive ? 'bg-primary/10 border-primary/50' : 'bg-transparent border-transparent hover:bg-glass hover:border-border'}`}
+                                        >
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className={`text-sm font-bold ${isActive ? 'text-primary' : 'text-gray-300'}`}>{mod.title}</span>
+                                                {isDone && <i className="fas fa-check text-success text-xs"></i>}
+                                            </div>
+                                            <span className="text-xs font-mono text-gray-500">{mod.subtitle}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <div className="pt-6 border-t border-border mt-auto">
+                                <button onClick={() => {setStatus('home'); setIsDashboardOpen(false);}} className="w-full py-3 bg-glass border border-border rounded-full text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white hover:bg-glassHover transition-all">
+                                    Abort Mission
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* MAIN CONTENT AREA */}
+                    {status !== 'teacher-guide' && (
+                        <main className="flex-1 relative z-10 overflow-hidden flex flex-col">
+                            
+                            {/* HOME SCREEN */}
+                            {status === 'home' && (
+                                <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in duration-1000">
+                                    <p className="text-primary text-sm font-bold uppercase tracking-[0.3em] mb-6 text-center">Level B1 • Complete Class Sequence</p>
+                                    <h1 className="text-5xl md:text-7xl font-light tracking-tighter text-white text-center max-w-4xl mb-8 leading-tight">
+                                        The Robot in the Room
+                                    </h1>
+                                    <p className="text-gray-400 font-light text-lg text-center max-w-2xl mb-16">
+                                        A 60-90 minute immersive curriculum. Flexible for standalone use or alongside your slide presentation.
+                                    </p>
+                                    
+                                    <button onClick={() => startSequence(0)} className="group relative px-12 py-5 bg-white text-black rounded-full font-bold uppercase tracking-[0.2em] text-sm overflow-hidden transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.2)]">
+                                        <span className="relative z-10 flex items-center gap-3">Initialize OS <i className="fas fa-power-off text-xs"></i></span>
+                                        <div className="absolute inset-0 bg-gray-200 transform scale-x-0 origin-left group-hover:scale-x-100 transition-transform duration-300 ease-out z-0"></div>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* ACTIVE MODULE CONTAINER */}
+                            {status === 'active' && (
+                                <div className="flex-1 p-6 md:p-12 overflow-y-auto hide-scroll flex flex-col">
+                                    {CurrentModule.type === 'icebreaker' && <IcebreakerModule key={CurrentModule.id} data={CurrentModule.data} moduleInfo={CurrentModule} onComplete={handleModuleComplete} onXP={handleXP} />}
+                                    {CurrentModule.type === 'concept' && <ConceptModule key={CurrentModule.id} data={CurrentModule.data} moduleInfo={CurrentModule} onComplete={handleModuleComplete} onXP={handleXP} />}
+                                    {CurrentModule.type === 'reading' && <ReadingModule key={CurrentModule.id} data={CurrentModule.data} moduleInfo={CurrentModule} onComplete={handleModuleComplete} onXP={handleXP} />}
+                                    {CurrentModule.type === 'theory' && <TheoryModule key={CurrentModule.id} data={CurrentModule.data} moduleInfo={CurrentModule} onComplete={handleModuleComplete} onXP={handleXP} />}
+                                    {CurrentModule.type === 'quiz' && <QuizModule key={CurrentModule.id} data={CurrentModule.data} moduleInfo={CurrentModule} onComplete={handleModuleComplete} onXP={handleXP} />}
+                                    {CurrentModule.type === 'dilemma' && <DilemmaModule key={CurrentModule.id} data={CurrentModule.data} moduleInfo={CurrentModule} onComplete={handleModuleComplete} onXP={handleXP} />}
+                                    {CurrentModule.type === 'roleplay' && <RoleplayModule key={CurrentModule.id} data={CurrentModule.data} moduleInfo={CurrentModule} onComplete={handleModuleComplete} onXP={handleXP} />}
+                                </div>
+                            )}
+
+                            {/* COMPLETION SCREEN */}
+                            {status === 'completion' && (
+                                <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in zoom-in-95 duration-1000">
+                                    <div className="w-24 h-24 rounded-full border border-success flex items-center justify-center mb-8 text-success text-4xl shadow-[0_0_50px_rgba(16,185,129,0.2)]">
+                                        <i className="fas fa-check"></i>
+                                    </div>
+                                    <h1 className="text-4xl md:text-5xl font-light tracking-tight text-white text-center mb-4">Classroom OS Halted</h1>
+                                    <p className="text-gray-400 font-light text-center max-w-xl mb-12">All curriculum modules successfully executed. Grammar logic and ethical parameters are fully optimized.</p>
+                                    
+                                    <div className="glass-panel rounded-2xl p-8 mb-12 flex gap-8 md:gap-12 text-center border-white/5">
+                                        <div>
+                                            <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Class XP</p>
+                                            <p className="text-3xl font-light text-primary">{globalXP}</p>
+                                        </div>
+                                        <div className="w-px bg-white/10"></div>
+                                        <div>
+                                            <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Modules</p>
+                                            <p className="text-3xl font-light text-white">{MODULES.length}/{MODULES.length}</p>
+                                        </div>
+                                    </div>
+
+                                    <button onClick={() => setStatus('home')} className="px-10 py-4 border border-border rounded-full text-xs font-bold uppercase tracking-widest text-white hover:bg-white hover:text-black transition-all">
+                                        Return to Root
+                                    </button>
+                                </div>
+                            )}
+                        </main>
+                    )}
+
+                    {/* TEACHER HUD (Live Whiteboard Panel) */}
+                    <div className={`fixed top-16 md:top-20 right-0 h-[calc(100vh-64px)] md:h-[calc(100vh-80px)] w-full md:w-96 bg-void/95 backdrop-blur-2xl border-l border-border z-50 transform transition-transform duration-500 ease-in-out flex flex-col ${isNotesOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                        <div className="p-6 border-b border-border flex justify-between items-center bg-black/40">
+                            <h3 className="text-sm font-bold text-accent uppercase tracking-widest"><i className="fas fa-edit mr-2"></i> Live Class Notes</h3>
+                            <button onClick={() => setIsNotesOpen(false)} className="text-gray-500 hover:text-white w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10"><i className="fas fa-times"></i></button>
+                        </div>
+                        <div className="flex-1 p-6 relative">
+                            <textarea 
+                                value={teacherNotes}
+                                onChange={(e) => setTeacherNotes(e.target.value)}
+                                className="w-full h-full bg-transparent text-gray-200 font-mono text-lg resize-none focus:outline-none placeholder-gray-600 leading-relaxed"
+                                placeholder="Type live vocabulary, error corrections, or brainstorm ideas here..."
+                                spellCheck="false"
+                            ></textarea>
+                            <div className="absolute bottom-6 right-6 text-xs text-gray-600 font-mono">Teacher Output Mode</div>
+                        </div>
+                    </div>
+
+                    {/* FLOATING ACTION BUTTON (Toggle Teacher HUD) */}
+                    {status !== 'teacher-guide' && (
+                        <button 
+                            onClick={() => setIsNotesOpen(!isNotesOpen)}
+                            className={`fixed bottom-8 right-8 w-14 h-14 rounded-full flex items-center justify-center text-xl shadow-[0_0_30px_rgba(0,0,0,0.6)] transition-all z-[60] ${isNotesOpen ? 'bg-white text-black scale-90' : 'bg-glass border border-border text-gray-400 hover:bg-glassHover hover:text-white hover:scale-110'}`}
+                            title="Toggle Teacher Whiteboard"
+                        >
+                            <i className={`fas ${isNotesOpen ? 'fa-times' : 'fa-pen'}`}></i>
+                        </button>
+                    )}
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
